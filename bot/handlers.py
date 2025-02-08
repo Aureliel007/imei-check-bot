@@ -1,33 +1,27 @@
 import re
 from datetime import datetime, timezone
 
-from aiogram import Bot, Dispatcher
 from aiogram.filters import CommandStart
 from aiogram.types import Message
 from aiogram import F
+from aiogram import Router
 
-from config import load_config
 from api_client import get_imei_info
+from filters import WhiteList
 
 
-config = load_config()
+router = Router()
 
-bot_token = config.token
-users_list = config.users_ids
-
-bot = Bot(token=bot_token)
-dp = Dispatcher()
-
-@dp.message(CommandStart(), F.from_user.id.in_(users_list))
+@router.message(CommandStart(), WhiteList())
 async def process_start_command(message: Message):
     await message.answer(f"Привет, {message.from_user.first_name}!\n"
                          f"Отправь мне IMEI, чтобы узнать детальную информацию об устройстве.")
 
-@dp.message(CommandStart(), F.from_user.id.not_in(users_list))
+@router.message(~WhiteList())
 async def process_start_command(message: Message):
     await message.answer("Нет доступа к боту, обратитесь к администратору.")
 
-@dp.message(F.text.regexp(re.compile(r"^\d{15}$")))
+@router.message(F.text.regexp(re.compile(r"^\d{15}$")), WhiteList())
 async def process_imei(message: Message):
     imei = message.text
 
@@ -64,11 +58,8 @@ async def process_imei(message: Message):
             f"Восстановлен: {'Да' if data.get("refurbished") else 'Нет'}\n"
         )
 
-@dp.message()
+@router.message()
 async def echo(message: Message):
     await message.answer(f"IMEI номер не распознан. Проверьте его и повторите попытку."
                          f"Номер должен состоять из 15 цифр."
                          f"Если ошибка повторится, обратитесь к администратору.")
-
-if __name__ == "__main__":
-    dp.run_polling(bot)
